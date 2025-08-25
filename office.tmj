@@ -416,28 +416,56 @@
          "name":"floorLayer",
          "objects":[
                 {
-                 "height":49,
+                 "height":44.5,
                  "id":28,
                  "name":"desk-01",
                  "rotation":0,
-                 "type":"",
+                 "type":"area",
                  "visible":true,
-                 "width":53.5,
-                 "x":106,
-                 "y":864
+                 "width":64.5,
+                 "x":96,
+                 "y":863.5
                 }, 
                 {
-                 "height":49,
+                 "height":47.5,
                  "id":30,
                  "name":"desk-02",
                  "rotation":0,
-                 "type":"",
+                 "type":"area",
                  "visible":true,
-                 "width":53.5,
-                 "x":103.75,
-                 "y":794
+                 "width":63.5,
+                 "x":96.75,
+                 "y":787
+                }, 
+                {
+                 "height":45,
+                 "id":31,
+                 "name":"desk-03",
+                 "rotation":0,
+                 "type":"area",
+                 "visible":true,
+                 "width":63.5,
+                 "x":31.25,
+                 "y":863.25
+                }, 
+                {
+                 "height":47.5,
+                 "id":32,
+                 "name":"desk-04",
+                 "rotation":0,
+                 "type":"area",
+                 "visible":true,
+                 "width":63.5,
+                 "x":30.25,
+                 "y":787
                 }],
          "opacity":1,
+         "properties":[
+                {
+                 "name":"name",
+                 "type":"string",
+                 "value":"desk-01"
+                }],
          "type":"objectgroup",
          "visible":true,
          "x":0,
@@ -538,7 +566,7 @@
          "y":0
         }],
  "nextlayerid":63,
- "nextobjectid":31,
+ "nextobjectid":33,
  "orientation":"orthogonal",
  "properties":[
         {
