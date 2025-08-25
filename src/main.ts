@@ -110,7 +110,7 @@ WA.onInit().then(() => {
       // Ao entrar na área da mesa
       WA.room.area.onEnter(areaName).subscribe(() => {
         showDeskActionMessage(areaName);
-      });d
+      });
 
       // Ao sair da área da mesa
       WA.room.area.onLeave(areaName).subscribe(() => {
