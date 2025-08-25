@@ -111,7 +111,7 @@ WA.onInit().then(() => {
       WA.room.area.onEnter(areaName).subscribe(() => {
         showDeskActionMessage(areaName);
       });
-
+      console.log('Desk area: ',areaName)
       // Ao sair da área da mesa
       WA.room.area.onLeave(areaName).subscribe(() => {
         if (deskMessages[areaName]) {
