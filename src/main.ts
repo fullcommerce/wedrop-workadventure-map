@@ -19,6 +19,8 @@ console.log('Script started successfully');
 let currentPopup: any = undefined;
 let currentDeskPopup: any = undefined;
 let currentDeskMessage: any = undefined;
+let isPopupOpen = false; // Flag para controlar se há popup aberto
+let popupIdCounter = 0; // Contador para IDs únicos de popup
 
 // Funções utilitárias para gerenciar o estado das mesas
 const getDesks = () => (WA.state.desks ?? {}) as Record<string, DeskOccupant | null>;
@@ -41,6 +43,36 @@ const saveCurrentPlayerPosition = async () => {
     console.log(`💾 Posição salva para ${playerName}: x=${position.x}, y=${position.y}`);
 };
 
+// Função segura para fechar popup
+const safeClosePopup = (popup: any, context: string) => {
+    if (!popup) {
+        console.log(`ℹ️ Popup já estava fechado (${context})`);
+        return;
+    }
+    
+    try {
+        popup.close();
+        console.log(`✅ Popup fechado com sucesso (${context})`);
+    } catch (e) {
+        console.log(`⚠️ Erro ao fechar popup (${context}):`, e);
+    }
+};
+
+// Função segura para remover mensagem
+const safeRemoveMessage = (message: any, context: string) => {
+    if (!message) {
+        console.log(`ℹ️ Mensagem já estava removida (${context})`);
+        return;
+    }
+    
+    try {
+        message.remove();
+        console.log(`✅ Mensagem removida com sucesso (${context})`);
+    } catch (e) {
+        console.log(`⚠️ Erro ao remover mensagem (${context}):`, e);
+    }
+};
+
 // Função para restaurar a posição do jogador
 const restorePlayerPosition = () => {
     const playerName = WA.player.name;
@@ -57,6 +89,12 @@ const restorePlayerPosition = () => {
 
 // Função para mostrar popup de reserva de mesa
 const showDeskReservationPopup = (areaName: string) => {
+  // Evita abrir múltiplos popups simultaneamente
+  if (isPopupOpen) {
+    console.log("⚠️ Popup já está aberto, ignorando nova tentativa");
+    return;
+  }
+
   const desks = getDesks();
   const me = WA.player.name;
   const isMine = desks[areaName]?.name === me;
@@ -73,8 +111,18 @@ const showDeskReservationPopup = (areaName: string) => {
       ? "Você deseja mudar sua mesa para cá? A antiga será liberada"
       : "Você deseja tornar essa mesa sua?";
     
+    // Fecha popup anterior se existir
+    safeClosePopup(currentDeskPopup, "popup anterior");
+    
+    // Gera ID único para o popup
+    popupIdCounter++;
+    const uniquePopupId = `desk-popup-${popupIdCounter}`;
+    
+    isPopupOpen = true; // Marca que há popup aberto
+    console.log(`🆕 Abrindo popup ${uniquePopupId} para área: ${areaName}`);
+    
     currentDeskPopup = WA.ui.openPopup(
-      `${areaName}-available-popup`,
+      uniquePopupId,
       popupMessage,
       [
         {
@@ -102,9 +150,14 @@ const showDeskReservationPopup = (areaName: string) => {
               
               await saveDesks(current);
               console.log("💾 Estado salvo com sucesso");
-              popup.close()
+              
+              // Fecha o popup após salvar
+              safeClosePopup(popup, "botão SIM");
+              currentDeskPopup = null;
+              isPopupOpen = false; // Reseta a flag
             } catch (e) {
               console.log("❌ Erro ao reservar mesa:", e);
+              isPopupOpen = false; // Reseta a flag mesmo com erro
             }
           }
         },
@@ -112,8 +165,10 @@ const showDeskReservationPopup = (areaName: string) => {
           label: "Não",
           className: "normal",
           callback: (popup) => {
-            popup.close()
-            // Popup fecha automaticamente ao clicar em qualquer botão
+            console.log("🔴 Botão NÃO clicado para mesa:", currentAreaName);
+            safeClosePopup(popup, "botão NÃO");
+            currentDeskPopup = null;
+            isPopupOpen = false; // Reseta a flag
           }
         }
       ]
@@ -125,6 +180,9 @@ const showDeskReservationPopup = (areaName: string) => {
     const timeText = timeSince < 1 ? "menos de 1 minuto" : 
                     timeSince === 1 ? "1 minuto" : 
                     `${timeSince} minutos`;
+    
+    // Remove mensagem anterior se existir
+    safeRemoveMessage(currentDeskMessage, "mensagem anterior");
     
     currentDeskMessage = WA.ui.displayPlayerMessage({
       message: `Essa mesa é do(a) ${occupant.name} desde ${timeText} atrás`,
@@ -170,30 +228,31 @@ WA.onInit().then(() => {
     deskAreas.forEach((areaName) => {
       // Ao entrar na área da mesa
       WA.room.area.onEnter(areaName).subscribe(() => {
-        showDeskReservationPopup(areaName);
+        console.log(`🚶 Entrou na área: ${areaName}`);
+        // Pequeno delay para evitar conflitos
+        setTimeout(() => {
+          showDeskReservationPopup(areaName);
+        }, 100);
       });
 
       // Ao sair da área da mesa - fecha o popup e mensagem
       WA.room.area.onLeave(areaName).subscribe(() => {
-        // Fecha o popup da mesa se estiver aberto
-        if (currentDeskPopup) {
-          try {
-            currentDeskPopup.close();
-          } catch (e) {
-            // Ignora erro se popup já foi fechado
+        console.log(`🚶 Saiu da área: ${areaName}`);
+        // Delay maior para dar tempo do usuário clicar nos botões
+        setTimeout(() => {
+          // Fecha o popup da mesa se estiver aberto
+          if (currentDeskPopup) {
+            safeClosePopup(currentDeskPopup, `área ${areaName}`);
+            currentDeskPopup = null;
+            isPopupOpen = false; // Reseta a flag
           }
-          currentDeskPopup = null;
-        }
-        
-        // Remove a mensagem se estiver visível
-        if (currentDeskMessage) {
-          try {
-            currentDeskMessage.remove();
-          } catch (e) {
-            // Ignora erro se mensagem já foi removida
+          
+          // Remove a mensagem se estiver visível
+          if (currentDeskMessage) {
+            safeRemoveMessage(currentDeskMessage, `área ${areaName}`);
+            currentDeskMessage = null;
           }
-          currentDeskMessage = null;
-        }
+        }, 1000); // 1 segundo de delay para dar tempo de clicar
       });
 
       console.log('Desk area: ',areaName)
