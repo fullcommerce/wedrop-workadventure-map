@@ -22,24 +22,103 @@ let currentDeskMessage: any = undefined;
 let isPopupOpen = false; // Flag para controlar se há popup aberto
 
 // Funções utilitárias para gerenciar o estado das mesas
-const getDesks = () => (WA.state.desks ?? {}) as Record<string, DeskOccupant | null>;
-const saveDesks = (next: Record<string, DeskOccupant | null>) =>
-  WA.state.saveVariable("desks", next);
+const getDesks = () => {
+  try {
+    // Tenta localStorage primeiro
+    const localDesks = localStorage.getItem('wa_desks');
+    if (localDesks) {
+      const parsedDesks = JSON.parse(localDesks);
+      console.log("📖 Desks lido do localStorage:", parsedDesks);
+      return parsedDesks as Record<string, DeskOccupant | null>;
+    }
+    
+    // Fallback para WA.state
+    const waDesks = WA.state.desks ?? {};
+    console.log("📖 Desks lido do WA.state:", waDesks);
+    return waDesks as Record<string, DeskOccupant | null>;
+  } catch (e) {
+    console.log("⚠️ Erro ao ler desks, retornando objeto vazio:", e);
+    return {};
+  }
+};
+
+const saveDesks = async (next: Record<string, DeskOccupant | null>) => {
+  try {
+    // Salva no localStorage primeiro
+    localStorage.setItem('wa_desks', JSON.stringify(next));
+    console.log("💾 Desks salvo no localStorage:", next);
+    
+    // Tenta salvar também no WA.state
+    try {
+      await WA.state.saveVariable("desks", next);
+      console.log("💾 Desks salvo também no WA.state:", next);
+    } catch (waError) {
+      console.log("⚠️ Erro ao salvar no WA.state, mas localStorage foi salvo:", waError);
+    }
+  } catch (e) {
+    console.log("❌ Erro ao salvar desks:", e);
+    throw e;
+  }
+};
 
 // Funções utilitárias para gerenciar posições dos jogadores
-const getPlayerPositions = () => (WA.state.playerPositions ?? {}) as Record<string, PlayerPosition>;
-const savePlayerPositions = (next: Record<string, PlayerPosition>) =>
-  WA.state.saveVariable("playerPositions", next);
+const getPlayerPositions = () => {
+  try {
+    // Tenta localStorage primeiro
+    const localPositions = localStorage.getItem('wa_playerPositions');
+    if (localPositions) {
+      const parsedPositions = JSON.parse(localPositions);
+      console.log("📖 PlayerPositions lido do localStorage:", parsedPositions);
+      return parsedPositions as Record<string, PlayerPosition>;
+    }
+    
+    // Fallback para WA.state
+    const waPositions = WA.state.playerPositions ?? {};
+    console.log("📖 PlayerPositions lido do WA.state:", waPositions);
+    return waPositions as Record<string, PlayerPosition>;
+  } catch (e) {
+    console.log("⚠️ Erro ao ler playerPositions, retornando objeto vazio:", e);
+    return {};
+  }
+};
+
+const savePlayerPositions = async (next: Record<string, PlayerPosition>) => {
+  try {
+    // Salva no localStorage primeiro
+    localStorage.setItem('wa_playerPositions', JSON.stringify(next));
+    console.log("💾 PlayerPositions salvo no localStorage:", next);
+    
+    // Tenta salvar também no WA.state
+    try {
+      await WA.state.saveVariable("playerPositions", next);
+      console.log("💾 PlayerPositions salvo também no WA.state:", next);
+    } catch (waError) {
+      console.log("⚠️ Erro ao salvar no WA.state, mas localStorage foi salvo:", waError);
+    }
+  } catch (e) {
+    console.log("❌ Erro ao salvar playerPositions:", e);
+    throw e;
+  }
+};
+
+
 
 // Função para salvar a posição atual do jogador
 const saveCurrentPlayerPosition = async () => {
-    const position = await WA.player.getPosition();
-    const playerName = WA.player.name;
-    const positions = getPlayerPositions();
-    
-    positions[playerName] = { x: position.x, y: position.y };
-    savePlayerPositions(positions);
-    console.log(`💾 Posição salva para ${playerName}: x=${position.x}, y=${position.y}`);
+    try {
+        const position = await WA.player.getPosition();
+        const playerName = WA.player.name;
+        
+        // Salva no sistema principal (localStorage + WA.state)
+        const positions = getPlayerPositions();
+        positions[playerName] = { x: position.x, y: position.y };
+        await savePlayerPositions(positions);
+        
+        console.log(`💾 Posição salva para ${playerName}: x=${position.x}, y=${position.y}`);
+    } catch (e) {
+        console.log("❌ Erro ao salvar posição (ignorando):", e);
+        // Não propaga o erro para não quebrar o sistema
+    }
 };
 
 // Função segura para fechar popup
@@ -194,6 +273,22 @@ WA.onInit().then(() => {
     console.log('Scripting API ready');
     console.log('Player tags: ',WA.player.tags)
 
+    // Inicializa variáveis se necessário
+    const initializeVariables = () => {
+        try {
+            // Verifica se as variáveis existem e inicializa se necessário
+            const currentDesks = getDesks();
+            const currentPositions = getPlayerPositions();
+            
+            console.log("✅ Variáveis inicializadas - Desks:", currentDesks, "Positions:", currentPositions);
+        } catch (e) {
+            console.log("❌ Erro ao inicializar variáveis:", e);
+        }
+    };
+    
+    // Inicializa variáveis ao conectar
+    initializeVariables();
+
     // Restaura a posição do jogador ao entrar
     restorePlayerPosition();
 
@@ -251,24 +346,39 @@ WA.onInit().then(() => {
       console.log('Desk area: ',areaName)
     });
 
-    // Teste: verificar se as variáveis existem
-    console.log("=== TESTE DE VARIÁVEIS ===");
+    // Inicialização e verificação das variáveis
+    console.log("=== INICIALIZAÇÃO DE VARIÁVEIS ===");
+    
+    // Inicializa a variável desks se não existir
     try {
       const testDesks = getDesks();
       console.log("✅ Variável 'desks' encontrada:", testDesks);
     } catch (e) {
-      console.log("❌ Variável 'desks' NÃO encontrada:", e);
-      console.log("💡 Crie um objeto no Tiled com nome 'desks' e tipo 'variable'");
+      console.log("❌ Variável 'desks' NÃO encontrada, criando...");
+      try {
+        WA.state.saveVariable("desks", {});
+        console.log("✅ Variável 'desks' criada com sucesso");
+      } catch (createError) {
+        console.log("❌ Erro ao criar variável 'desks':", createError);
+        console.log("💡 Crie um objeto no Tiled com nome 'desks' e tipo 'variable'");
+      }
     }
     
+    // Inicializa a variável playerPositions se não existir
     try {
       const testPositions = getPlayerPositions();
       console.log("✅ Variável 'playerPositions' encontrada:", testPositions);
     } catch (e) {
-      console.log("❌ Variável 'playerPositions' NÃO encontrada:", e);
-      console.log("💡 Crie um objeto no Tiled com nome 'playerPositions' e tipo 'variable'");
+      console.log("❌ Variável 'playerPositions' NÃO encontrada, criando...");
+      try {
+        WA.state.saveVariable("playerPositions", {});
+        console.log("✅ Variável 'playerPositions' criada com sucesso");
+      } catch (createError) {
+        console.log("❌ Erro ao criar variável 'playerPositions':", createError);
+        console.log("💡 Crie um objeto no Tiled com nome 'playerPositions' e tipo 'variable'");
+      }
     }
-    console.log("=== FIM DO TESTE ===");
+    console.log("=== FIM DA INICIALIZAÇÃO ===");
 
     // Listener para mudanças no estado das mesas (atualização em tempo real)
     WA.state.onVariableChange("desks").subscribe(() => {
