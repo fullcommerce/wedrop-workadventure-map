@@ -5,77 +5,103 @@ import { bootstrapExtra } from "@workadventure/scripting-api-extra";
 // Tipos para o sistema de reserva de mesas
 type DeskOccupant = { name: string; since: number };
 
-declare module "@workadventure/iframe-api-typings" {
-  interface RoomState {
-    desks: Record<string, DeskOccupant | null>;
-  }
-}
+// Estado local das mesas (não persistente entre sessões)
+let desksState: Record<string, DeskOccupant | null> = {};
 
 console.log('Script started successfully');
 
 let currentPopup: any = undefined;
-let deskMessages: Record<string, any> = {};
+let currentDeskPopup: any = undefined;
+let currentDeskMessage: any = undefined;
 
 // Funções utilitárias para gerenciar o estado das mesas
 const getDesks = () => (WA.state.desks ?? {}) as Record<string, DeskOccupant | null>;
 const saveDesks = (next: Record<string, DeskOccupant | null>) =>
   WA.state.saveVariable("desks", next);
 
-// Função para atualizar o feedback visual das mesas
-const updateDeskVisual = (areaName: string, occupant: DeskOccupant | null) => {
-  if (occupant) {
-    // Mostra layer de mesa ocupada (se existir)
-    try {
-      WA.room.showLayer(`${areaName}-occupied`);
-      WA.room.hideLayer(`${areaName}-available`);
-    } catch (e) {
-      console.log(`Layers ${areaName}-occupied ou ${areaName}-available não encontradas`);
-    }
-  } else {
-    // Mostra layer de mesa disponível (se existir)
-    try {
-      WA.room.hideLayer(`${areaName}-occupied`);
-      WA.room.showLayer(`${areaName}-available`);
-    } catch (e) {
-      console.log(`Layers ${areaName}-occupied ou ${areaName}-available não encontradas`);
-    }
-  }
-};
 
-// Função para mostrar mensagem de ação da mesa
-const showDeskActionMessage = (areaName: string) => {
+
+
+
+// Função para mostrar popup de reserva de mesa
+const showDeskReservationPopup = (areaName: string) => {
   const desks = getDesks();
   const me = WA.player.name;
   const isMine = desks[areaName]?.name === me;
 
-  let message = "";
   if (!desks[areaName]) {
-    message = "Clique para reservar esta mesa";
-  } else if (isMine) {
-    message = "Clique para liberar sua mesa";
-  } else {
-    message = `Mesa ocupada por ${desks[areaName]!.name}`;
-  }
-
-  deskMessages[areaName] = WA.ui.displayActionMessage({
-    message: message,
-    callback: async () => {
-      const current = getDesks();
-      const now = Date.now();
-
-      if (!current[areaName]) {
-        // Reservar mesa
-        current[areaName] = { name: me, since: now };
-        await saveDesks(current);
-        WA.chat.sendChatMessage("Mesa reservada! 👏", "sistema");
-      } else if (current[areaName]!.name === me) {
-        // Liberar mesa
-        current[areaName] = null;
-        await saveDesks(current);
-        WA.chat.sendChatMessage("Mesa liberada! ✅", "sistema");
+    // Mesa disponível - mostra popup para reservar
+    const currentAreaName = areaName; // Captura a variável no escopo
+    
+    // Verifica se o usuário já tem uma mesa
+    const current = getDesks();
+    const hasCurrentDesk = Object.keys(current).some(deskKey => current[deskKey]?.name === me);
+    
+    const popupMessage = hasCurrentDesk 
+      ? "Você deseja mudar sua mesa para cá? A antiga será liberada"
+      : "Você deseja tornar essa mesa sua?";
+    
+    currentDeskPopup = WA.ui.openPopup(
+      `${areaName}-available-popup`,
+      popupMessage,
+      [
+        {
+          label: "Sim",
+          className: "primary",
+          callback: async (popup) => {
+            console.log("🟢 Botão SIM clicado para mesa:", currentAreaName);
+            try {
+              const current = getDesks();
+              const now = Date.now();
+              
+              console.log("📊 Estado atual das mesas:", current);
+              
+              // Libera mesa antiga do usuário (se existir)
+              Object.keys(current).forEach(deskKey => {
+                if (current[deskKey]?.name === me) {
+                  console.log("🔄 Liberando mesa antiga:", deskKey);
+                  current[deskKey] = null;
+                }
+              });
+              
+              // Reserva nova mesa
+              current[currentAreaName] = { name: me, since: now };
+              console.log("✅ Reservando nova mesa:", currentAreaName);
+              
+              await saveDesks(current);
+              console.log("💾 Estado salvo com sucesso");
+              popup.close()
+            } catch (e) {
+              console.log("❌ Erro ao reservar mesa:", e);
+            }
+          }
+        },
+        {
+          label: "Não",
+          className: "normal",
+          callback: (popup) => {
+            popup.close()
+            // Popup fecha automaticamente ao clicar em qualquer botão
+          }
+        }
+      ]
+    );
+  } else if (!isMine) {
+    // Mesa ocupada por outro usuário - mostra mensagem informativa
+    const occupant = desks[areaName]!;
+    const timeSince = Math.floor((Date.now() - occupant.since) / 1000 / 60); // minutos
+    const timeText = timeSince < 1 ? "menos de 1 minuto" : 
+                    timeSince === 1 ? "1 minuto" : 
+                    `${timeSince} minutos`;
+    
+    currentDeskMessage = WA.ui.displayPlayerMessage({
+      message: `Essa mesa é do(a) ${occupant.name} desde ${timeText} atrás`,
+      callback: () => {
+        // Não faz nada, apenas informativo
       }
-    },
-  });
+    });
+  }
+  // Não mostra nada para própria mesa
 };
 
 // Waiting for the API to be ready
@@ -109,43 +135,117 @@ WA.onInit().then(() => {
     deskAreas.forEach((areaName) => {
       // Ao entrar na área da mesa
       WA.room.area.onEnter(areaName).subscribe(() => {
-        showDeskActionMessage(areaName);
+        showDeskReservationPopup(areaName);
       });
-      console.log('Desk area: ',areaName)
-      // Ao sair da área da mesa
+
+      // Ao sair da área da mesa - fecha o popup e mensagem
       WA.room.area.onLeave(areaName).subscribe(() => {
-        if (deskMessages[areaName]) {
-          deskMessages[areaName].remove();
-          deskMessages[areaName] = null;
+        // Fecha o popup da mesa se estiver aberto
+        if (currentDeskPopup) {
+          try {
+            currentDeskPopup.close();
+          } catch (e) {
+            // Ignora erro se popup já foi fechado
+          }
+          currentDeskPopup = null;
+        }
+        
+        // Remove a mensagem se estiver visível
+        if (currentDeskMessage) {
+          try {
+            currentDeskMessage.remove();
+          } catch (e) {
+            // Ignora erro se mensagem já foi removida
+          }
+          currentDeskMessage = null;
         }
       });
+
+      console.log('Desk area: ',areaName)
     });
+
+        // Teste: verificar se a variável desks existe
+    console.log("=== TESTE DE VARIÁVEL DESKS ===");
+    try {
+      const testDesks = getDesks();
+      console.log("✅ Variável 'desks' encontrada:", testDesks);
+    } catch (e) {
+      console.log("❌ Variável 'desks' NÃO encontrada:", e);
+      console.log("💡 Crie um objeto no Tiled com nome 'desks' e tipo 'variable'");
+    }
+    console.log("=== FIM DO TESTE ===");
 
     // Listener para mudanças no estado das mesas (atualização em tempo real)
     WA.state.onVariableChange("desks").subscribe(() => {
       const desks = getDesks();
       
-      // Atualiza o feedback visual para todas as mesas
-      deskAreas.forEach((areaName) => {
-        updateDeskVisual(areaName, desks[areaName]);
-        
-        // Atualiza a mensagem de ação se o usuário estiver na área
-        if (deskMessages[areaName]) {
-          deskMessages[areaName].remove();
-          showDeskActionMessage(areaName);
-        }
-      });
+      // Não atualiza popups automaticamente - deixa o usuário controlar
     });
 
-    // Inicializa o estado visual das mesas
-    const initialDesks = getDesks();
-    deskAreas.forEach((areaName) => {
-      updateDeskVisual(areaName, initialDesks[areaName]);
-    });
+
 
     // The line below bootstraps the Scripting API Extra library that adds a number of advanced properties/features to WorkAdventure
     bootstrapExtra().then(() => {
         console.log('Scripting API Extra ready');
+        
+        // Adiciona botão "Ir para a mesa" no ActionsMenu
+        WA.ui.actionBar.addButton({
+            id: 'go-to-desk',
+            type: 'action',
+            imageSrc: 'https://img.icons8.com/ios/50/000000/desk.png',
+            toolTip: 'Ir para minha mesa',
+            callback: () => {
+                const desks = getDesks();
+                const me = WA.player.name;
+                
+                // Encontra a mesa do usuário
+                const myDesk = Object.keys(desks).find(deskKey => desks[deskKey]?.name === me);
+                
+                if (myDesk) {
+                    console.log(`🚀 Indo para minha mesa: ${myDesk}`);
+                    
+                    // Mostra popup com informações da mesa
+                    WA.ui.openPopup(
+                        'my-desk-info',
+                        `Sua mesa é: ${myDesk}`,
+                        [
+                            {
+                                label: "Ir para a mesa",
+                                className: "primary",
+                                callback: () => {
+                                    // Mostra instruções de navegação
+                                    console.log(`🚀 Navegando para ${myDesk}`);
+                                    WA.ui.displayPlayerMessage({
+                                        message: `Navegue até a área ${myDesk} para gerenciar sua mesa.`,
+                                        callback: () => {}
+                                    });
+                                }
+                            },
+                            {
+                                label: "Liberar mesa",
+                                className: "normal",
+                                callback: async () => {
+                                    const current = getDesks();
+                                    current[myDesk] = null;
+                                    await saveDesks(current);
+                                    console.log(`Mesa ${myDesk} liberada`);
+                                }
+                            }
+                        ]
+                    );
+                } else {
+                    console.log("❌ Você não tem uma mesa reservada");
+                    // Mostra mensagem informativa
+                    WA.ui.displayPlayerMessage({
+                        message: "Você não tem uma mesa reservada",
+                        callback: () => {
+                            // Não faz nada, apenas informativo
+                        }
+                    });
+                }
+            }
+        });
+        
     }).catch(e => console.error(e));
 
 }).catch(e => console.error(e));

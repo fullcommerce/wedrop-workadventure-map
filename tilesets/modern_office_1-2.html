@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TileSet Search</title>
+    <style type="text/css">
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        :root {
+            --missing: #536769;
+            --animation: #828b24;
+            --character: #854974;
+            --tileset: #ab4317;
+            --single: #1c3d4d;
+            --background: #404059;
+            --shade: #363648;
+            --text: #f9f7e5;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            overflow-y: scroll;
+        }
+        a {
+            color: #ffdf76;
+            text-decoration: none;
+        }
+        h1 {
+            text-align: center;
+            font-family: 'Press Start 2P', sans-serif;
+            text-shadow: 3px 3px var(--shade);
+        }
+        form {
+            display: flex;
+            margin: 0 auto;
+            width: 50%;
+            gap: 0.25em;
+        }
+        input {
+            padding: 0.5em;
+        }
+        select, button, input {
+            border: 1px solid var(--shade);
+            box-shadow: 2px 2px 0 var(--shade);
+            background-color: var(--text);
+            color: var(--shade);
+            padding: 0.4em 0.5em;
+        }
+        input:hover, select:hover, button:hover {
+            background-color: #ffdf76;
+        }
+        img {
+            image-rendering: pixelated;
+        }
+        #query {
+            flex-grow: 1;
+        }
+        #tags {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        #tags li {
+            list-style: none;
+            margin: 0 0.25em 0.75em 0;
+        }
+        #tags a {
+            font-size: 0.75em;
+            background-color: var(--shade);
+            border-radius: 1em;
+            padding: 0.5em 0.75em;
+            text-transform: capitalize;
+        }
+        #tags a:hover {
+            background-color: #fff2;
+        }
+        #message {
+            text-align: center;
+            color: #f05d5d;
+            text-shadow: 1px 1px 0 var(--shade);
+        }
+        #results ul {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 0.5em;
+        }
+        #results li {
+            list-style: none;
+            margin: 0.25em;
+        }
+        #results li:hover {
+            filter: brightness(1.2);
+        }
+        #results li.single.missing img {
+            border: 2px dashed var(--missing);
+            border-radius: 2px;
+        }
+        #results li.animation img {
+            border: 2px dashed var(--animation);
+            border-radius: 2px;
+        }
+        #results li.character img {
+            border: 2px dashed var(--character);
+            border-radius: 2px;
+        }
+        #results li.tileset img {
+            border: 2px dashed var(--tileset);
+            border-radius: 2px;
+        }
+        #results img {
+            max-height: 128px;
+            max-width: 45vw;
+            cursor: pointer;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background-color: #000c;
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal .item {
+            min-width: 20em;
+            max-width: 80%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            background-color: var(--background);
+            display: grid;
+            grid-template-columns: 256px auto;
+            grid-template-rows: auto auto auto;
+            grid-auto-flow: row;
+            align-items: center;
+            grid-gap: 1em;
+            grid-template-areas:
+                "header header"
+                "thumbnail detail"
+                "extras extras";
+        }
+        .modal .item .header {
+            font-family: 'Press Start 2P', sans-serif;
+            text-shadow: 2px 2px #0008;
+            grid-area: header;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            line-height: 2em;
+            padding-left: 1em;
+            background-color: var(--shade);
+        }
+        .modal .item .header span {
+            max-width: 70vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .modal .item .close {
+            padding: 0 0.5em;
+            margin-left: 0.5em;
+            background-color: #bd3939;
+            text-shadow: 2px 2px #902626;
+        }
+        .modal .item .thumbnail {
+            grid-area: thumbnail;
+            text-align: center;
+            box-sizing: border-box;
+            padding-left: 1em;
+        }
+        .modal .item .thumbnail.large {
+            max-height: 256px;
+            overflow-y: auto;
+        }
+        .modal .item .thumbnail img {
+            max-width: 100%;
+            max-height: 100%;
+            transition: all 0.25s ease;
+            background-color: var(--background);
+        }
+        .modal .item .thumbnail.small img:hover {
+            transform: scale(3);
+        }
+        .modal .item .thumbnail.medium img:hover {
+            transform: scale(1.5);
+        }
+        .modal .item.single .thumbnail img,
+        .modal .item.animation .thumbnail img {
+            border: 2px solid var(--shade);
+            background-size: 32px 32px;
+            background-position: 0 0, 0 16px, 16px -16px, -16px 0px;
+            background-image:
+                linear-gradient(45deg, var(--shade) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--shade) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--shade) 75%),
+                linear-gradient(-45deg, transparent 75%, var(--shade) 75%);
+        }
+        .modal .item .detail {
+            grid-area: detail;
+            margin-right: 1em;
+        }
+        .modal .item .path {
+            background: var(--shade);
+            font-family: monospace;
+            padding: 1em;
+            cursor: pointer;
+        }
+        .modal .item .tags {
+            text-transform: capitalize;
+            margin-bottom: 1em;
+        }
+        .modal .item .extras {
+            grid-area: extras;
+            margin: 0 1em 1em 1em;
+        }
+        .modal .item .extras > *:first-child {
+            margin-top: 0;
+        }
+        .modal .item .extras .tileset-outline {
+            display: inline-block;
+            height: 320px;
+            position: relative;
+            cursor: pointer;
+            box-sizing: border-box;
+            border: 2px dashed var(--tileset);
+        }
+        .modal .item .extras .tileset-outline:not(:last-child) {
+            margin-right: 1em;
+        }
+        .modal .item .extras .tileset-outline img {
+            height: 100%;
+            transition: all 0.5s;
+            filter: brightness(0.75);
+        }
+        .modal .item .extras .tileset-outline .outline {
+            position: absolute;
+            box-sizing: border-box;
+            border-width: 2px;
+            border-style: solid;
+            margin: -2px;
+            image-rendering: pixelated;
+            background-size: cover;
+        }
+        .modal .item .extras .tileset-outline:hover img {
+            filter: brightness(0.5);
+        }
+        .modal .item .extras .tileset-outline:hover .outline {
+            animation: blink 1s infinite;
+        }
+        .modal .item .extras .tileset-map {
+            position: relative;
+        }
+        .modal .item .extras .tileset-map img {
+            filter: brightness(0.5);
+        }
+        .modal .item .extras .tileset-highlight {
+            position: absolute;
+            cursor: pointer;
+            background: #0002;
+        }
+        @keyframes blink {
+            0% { opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+    </style>
+</head>
+<body>
+    <h1>LimeZu TileSet Search</h1>
+    <form id="search">
+        <input type="text" id="query" placeholder="Search for a sprite">
+        <select id="tile-size">
+            <option value="16" selected>16×16</option>
+            <option value="32">32×32</option>
+            <option value="48">48×48</option>
+        </select>
+        <button>Search</button>
+    </form>
+    <ul id="tags"></ul>
+    <div id="message"></div>
+    <div id="results"></div>
+    <template id="tag">
+        <li><a href="#"></a></li>
+    </template>
+    <template id="modal">
+        <div class="modal">
+            <div class="item">
+                <div class="header">
+                    <span class="name"></span> <a href="#" class="close">X</a>
+                </div>
+                <div class="thumbnail"><img></div>
+                <div class="detail">
+                    <div class="tags"></div>
+                    <div class="path" title="Click to copy path to clipboard"></div>
+                </div>
+                <div class="extras"></div>
+            </div>
+        </div>
+    </template>
+    <template id="single-extras">
+        <div class="tileset-outline">
+            <img>
+        </div>
+    </template>
+    <template id="tileset-extras">
+        <div class="tileset-map">
+            <img usemap="#map">
+            <map name="map"></map>
+        </div>
+    </template>
+    <script type="text/javascript">
+        let activeModal = null;
+        let hiddenModals = [];
+        function load(data) {
+            Object.entries(data).forEach(([key, value]) => value.id = key);
+            updateSearch(data);
+            document.getElementById('query').addEventListener('keyup', () => updateSearch(data));
+            document.getElementById('tile-size').addEventListener('change', () => updateSearch(data));
+            document.getElementById('search').addEventListener('submit', e => {
+                e.preventDefault();
+                updateSearch(data);
+            });
+        }
+        function updateSearch(data, limit=500) {
+            let output = document.getElementById('results');
+            output.innerHTML = '';
+            let message = document.getElementById('message');
+            message.innerHTML = '';
+            let query = document.getElementById('query').value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+            let queryTerms = query.split(' ');
+            let results = [];
+            if (query) {
+                for (let item of Object.values(data)) {
+                    // Get the index of the last appearance of query in the path
+                    let corpus = item.path.toLocaleLowerCase() + ' ' + item.tags.join(' ');
+                    let index = -1;
+                    let termCount = 0;
+                    for (let term of queryTerms) {
+                        let i = corpus.lastIndexOf(term);
+                        if (i > -1) {
+                            index = Math.max(index, i);
+                        } else {
+                            index = -1;
+                            break;
+                        }
+                        if (item.tags.includes(term)) {
+                            termCount++;
+                        }
+                    }
+                    if (index > -1) {
+                        results.push({order: termCount, ...item});
+                    }
+                }
+            } else {
+                results = Object.values(data);
+            }
+            results.sort((a, b) => {
+                if (a.kind != b.kind) return a.kind > b.kind ? -1 : 1;
+                let aName = a.path.split('/').pop();
+                let bName = b.path.split('/').pop();
+                return aName > bName ? -1 : 1;
+            });
+            // Display the results
+            let ul = document.createElement('ul');
+            output.appendChild(ul);
+            for (let i = 0; i < results.length; i++) {
+                if (i > limit) {
+                    message.innerHTML = `Displaying the first ${limit} of ${results.length} results only. Please refine your search.`;
+                    break;
+                }
+                let item = results[i];
+                let li = document.createElement('li');
+                ul.appendChild(li);
+                li.classList.add(item.kind)
+                if (item.kind == 'single' && item.tilesets.length == 0) {
+                    li.classList.add('missing');
+                }
+                let img = document.createElement('img');
+                li.appendChild(img);
+                img.src = img.title = formatPath(item.path);
+                img.addEventListener('click', displayItemModal.bind(null, data, item.id));
+            }
+            updateTags(results);
+        }
+        function updateTags(itemList, limit=25) {
+            let ul = document.querySelector('#tags');
+            ul.innerHTML = '';
+            let tagCount = {};
+            for (let item of itemList) {
+                for (let tag of item.tags) {
+                    tagCount[tag] = (tagCount[tag] || 0) + 1;
+                }
+            }
+            let sortedTagCounts = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+            let template = document.querySelector('#tag');
+            let i = 1;
+            for (let [tag, count] of sortedTagCounts) {
+                if (count == itemList.length) continue;
+                ul.appendChild(template.content.cloneNode(true));
+                let li = ul.lastElementChild;
+                let a = li.querySelector('a');
+                if (i++ <= limit) {
+                    a.innerHTML = `${tag} (${count})`;
+                    a.addEventListener('click', e => {
+                        e.preventDefault();
+                        let query = document.querySelector('#query');
+                        query.value = `${query.value} ${tag}`.trim();
+                        query.dispatchEvent(new KeyboardEvent('keyup'));
+                    });
+                } else {
+                    a.innerHTML = `...`;
+                    a.title = `Show all ${sortedTagCounts.length} tags`;
+                    a.addEventListener('click', e => {
+                        e.preventDefault();
+                        updateTags(itemList, sortedTagCounts.length);
+                    });
+                    break;
+                }
+            }
+        }
+        function displayItemModal(data, id) {
+            let item = data[id];
+            let template = document.querySelector('#modal');
+            // Modal
+            if (activeModal) {
+                document.body.removeChild(activeModal);
+                hiddenModals.push(activeModal);
+            }
+            document.body.appendChild(template.content.cloneNode(true));
+            let divModal = activeModal = document.body.lastElementChild;
+            divModal.addEventListener('click', e => {
+                if (e.target == divModal) {
+                    closeModal();
+                }
+            });
+            // Item
+            let divItem = divModal.querySelector('div.item');
+            divItem.classList.add(item.kind);
+            // Header
+            let spanName = divItem.querySelector('span.name');
+            spanName.innerHTML = item.path.split('/').pop();
+            let aClose = divItem.querySelector('a.close');
+            aClose.addEventListener('click', e => {
+                e.preventDefault();
+                closeModal();
+            });
+            // Thumbnail
+            let divThumbnail = divItem.querySelector('div.thumbnail');
+            let imgThumbnail = divThumbnail.querySelector('img');
+            divThumbnail.appendChild(imgThumbnail);
+            imgThumbnail.src = formatPath(item.path);
+            imgThumbnail.addEventListener('load', () => {
+                let width = imgThumbnail.naturalWidth;
+                let height = imgThumbnail.naturalHeight;
+                divThumbnail.classList.add(
+                    height < 96 && width < 96 ? 'small' : height < 192 && width < 192 ? 'medium' : 'large'
+                );
+                divThumbnail.addEventListener('click', e => {
+                    e.preventDefault();
+                    let canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.getContext('2d').drawImage(imgThumbnail, 0, 0);
+                    canvas.toBlob(blob => {
+                        navigator.clipboard.write([
+                            new ClipboardItem({[blob.type]: blob}),
+                        ]);
+                    }, 'image/png');
+                });
+            });
+            // Detail
+            let divDetail = divItem.querySelector('div.detail');
+            // Detail/Tags
+            let divTags = divItem.querySelector('div.tags');
+            divTags.innerHTML = item.tags.join(', ') + '.';
+            // Detail/Path
+            let divPath = divItem.querySelector('div.path');
+            divPath.innerHTML = item.path.replace(/\//g, '/<br>');
+            divPath.addEventListener('click', e => {
+                e.preventDefault();
+                navigator.clipboard.writeText(item.path);
+            });
+            // Extras
+            let divExtras = divItem.querySelector('div.extras');
+            switch (item.kind) {
+                case 'single':
+                    addSingleExtras(divExtras, data, item);
+                    break;
+                case 'tileset':
+                    addTilesetExtras(divExtras, data, item);
+                    break;
+                default:
+                    divExtras.innerHTML = `<p>${item.kind} details not implemented.</p>`;
+                    break;
+            }
+        }
+        function closeModal() {
+            activeModal.remove();
+            activeModal = null;
+            if (hiddenModals.length > 0) {
+                activeModal = hiddenModals.pop();
+                document.body.appendChild(activeModal);
+            }
+        }
+        function addSingleExtras(div, data, single) {
+            if (single.tilesets.length == 0) {
+                div.innerHTML = '<p>This exact tile was not found in any tilesets.</p>';
+            } else {
+                div.innerHTML = `<p>Found in ${single.tilesets.length} tileset(s):</p>`;
+            }
+            let template = document.querySelector('#single-extras');
+            for (let id of single.tilesets) {
+                let tileset = data[id];
+                let [sW, sH] = single.shape;
+                let [tW, tH] = tileset.shape;
+                div.appendChild(template.content.cloneNode(true));
+                let divTileset = div.lastElementChild;
+                divTileset.title = tileset.path;
+                divTileset.addEventListener('click', e => {
+                    e.preventDefault();
+                    displayItemModal(data, tileset.id);
+                });
+                let imgTileset = divTileset.querySelector('img');
+                imgTileset.src = formatPath(tileset.path);
+                for (let [tilesetRect, singleRect, score] of tileset.tiles[single.id]) {
+                    let outline = {
+                        left: tilesetRect[0] / tW * 100,
+                        top: tilesetRect[1] / tH * 100,
+                        right: (tW - tilesetRect[0] - tilesetRect[2]) / tW * 100,
+                        bottom: (tH - tilesetRect[1] - tilesetRect[3]) / tH * 100,
+                    };
+                    let divOutline = divTileset.appendChild(document.createElement('div'));
+                    divOutline.classList.add('outline');
+                    divOutline.style.left = outline.left + '%';
+                    divOutline.style.top = outline.top + '%';
+                    divOutline.style.right = outline.right + '%';
+                    divOutline.style.bottom = outline.bottom + '%';
+                    divOutline.style.borderColor = `hsl(${score * 120}, 100%, 50%)`;
+                    divOutline.style.backgroundImage = `url(${formatPath(single.path)})`;
+                }
+            }
+        }
+        function addTilesetExtras(div, data, tileset) {
+            div.innerHTML = `<p>Found ${Object.keys(tileset.tiles).length} tile(s):</p>`;
+            let template = document.querySelector('#tileset-extras');
+            div.appendChild(template.content.cloneNode(true));
+            let divTileset = div.lastElementChild;
+            let imgTileset = div.querySelector('img');
+            imgTileset.src = formatPath(tileset.path);
+            let map = div.querySelector('map');
+            for (let [id, tiles] of Object.entries(tileset.tiles)) {
+                let single = data[id];
+                for (let [[tx, ty, tw, th], [sx, sy, sw, sh], score] of tiles) {
+                    let area = map.appendChild(document.createElement('area'));
+                    area.shape = 'rect';
+                    area.coords = `${tx},${ty},${tx+tw},${ty+th}`;
+                    area.addEventListener('mouseenter', e => {
+                        divTileset.querySelectorAll('.tileset-highlight').forEach(e => e.remove());
+                        let divHighlight = divTileset.appendChild(document.createElement('div'));
+                        divHighlight.classList.add('tileset-highlight');
+                        divHighlight.title = single.path;
+                        divHighlight.style.left = `${tx}px`;
+                        divHighlight.style.top = `${ty}px`;
+                        divHighlight.style.width = `${tw}px`;
+                        divHighlight.style.height = `${th}px`;
+                        divHighlight.style.backgroundImage = `url(${formatPath(single.path)})`;
+                        divHighlight.addEventListener('mouseout', e => {
+                            divHighlight.remove();
+                        });
+                        divHighlight.addEventListener('click', e => {
+                            e.preventDefault();
+                            displayItemModal(data, id);
+                        });
+                    });
+                }
+            }
+        }
+        function formatPath(path) {
+            let tileSize = document.getElementById('tile-size').value;
+            return path.replaceAll('16x16', `${tileSize}x${tileSize}`);
+        }
+        load({"#0": {"kind": "tileset", "path": "Modern_Office_Revamped_v1.2/Modern_Office_16x16.png", "tags": ["revamped", "office", "tilesets"], "shape": [256, 848], "tiles": {"#56": [[[32, 720, 32, 48], [0, 0, 32, 48], 1.0]], "#40": [[[208, 256, 32, 48], [0, 0, 32, 48], 1.0]], "#269": [[[0, 256, 32, 48], [0, 0, 32, 48], 1.0]], "#318": [[[128, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#125": [[[32, 0, 32, 48], [0, 0, 32, 48], 0.565217391304348], [[80, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#308": [[[80, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#200": [[[192, 608, 32, 48], [0, 0, 32, 48], 1.0]], "#285": [[[224, 0, 32, 32], [0, 16, 32, 32], 0.33593749999999983], [[224, 0, 32, 48], [0, 0, 32, 48], 0.4921874999999999], [[32, 624, 32, 48], [0, 0, 32, 48], 0.84375], [[48, 624, 32, 48], [0, 0, 32, 48], 1.0]], "#114": [[[224, 512, 32, 48], [0, 0, 32, 48], 0.5209580838323348]], "#177": [[[64, 160, 32, 48], [0, 0, 32, 48], 1.0]], "#76": [[[240, 176, 16, 48], [0, 0, 16, 48], 1.0]], "#45": [[[224, 288, 32, 48], [0, 0, 32, 48], 1.0]], "#62": [[[112, 544, 32, 48], [0, 0, 32, 48], 1.0]], "#15": [[[16, 192, 32, 48], [0, 0, 32, 48], 1.0]], "#208": [[[240, 480, 16, 48], [0, 0, 16, 48], 1.0]], "#37": [[[176, 256, 32, 48], [0, 0, 32, 48], 1.0]], "#241": [[[224, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#273": [[[80, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[112, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#83": [[[176, 288, 32, 48], [0, 0, 32, 48], 1.0]], "#73": [[[80, 0, 32, 32], [0, 16, 32, 32], 1.0], [[112, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[80, 0, 32, 48], [0, 0, 32, 48], 0.1406249999999998]], "#250": [[[144, 0, 32, 32], [0, 16, 32, 32], 0.765625], [[144, 0, 32, 48], [0, 0, 32, 48], 1.0], [[16, 512, 32, 48], [0, 0, 32, 48], 0.1406249999999998], [[32, 528, 32, 48], [0, 0, 32, 48], 0.4140624999999999], [[48, 528, 32, 48], [0, 0, 32, 48], 0.4140624999999999], [[64, 672, 32, 48], [0, 0, 32, 48], 0.4531249999999999], [[80, 672, 32, 48], [0, 0, 32, 48], 0.25781249999999983]], "#279": [[[0, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#286": [[[144, 368, 32, 48], [0, 0, 32, 48], 1.0]], "#12": [[[80, 48, 32, 48], [0, 0, 32, 48], 0.06249999999999979], [[80, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#113": [[[0, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333], [[16, 0, 32, 32], [0, 16, 32, 32], 1.0], [[32, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333]], "#315": [[[192, 352, 32, 48], [0, 0, 32, 48], 1.0]], "#293": [[[192, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#232": [[[192, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#4": [[[208, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#174": [[[176, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#216": [[[48, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#218": [[[176, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#201": [[[144, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#276": [[[144, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#116": [[[96, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#29": [[[32, 64, 32, 48], [0, 0, 32, 48], 1.0], [[128, 464, 32, 48], [0, 0, 32, 48], 0.6093749999999999]], "#60": [[[0, 416, 32, 48], [0, 0, 32, 48], 1.0], [[48, 416, 32, 48], [0, 0, 32, 48], 0.45736434108527135], [[96, 416, 32, 48], [0, 0, 32, 48], 0.22480620155038716]], "#136": [[[160, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[192, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#53": [[[160, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#92": [[[48, 592, 32, 48], [0, 0, 32, 48], 0.765625], [[64, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#162": [[[80, 0, 32, 32], [0, 16, 32, 32], 0.1406249999999998], [[80, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#16": [[[208, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#82": [[[48, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#191": [[[64, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#270": [[[32, 576, 32, 48], [0, 0, 32, 48], 0.84375], [[48, 576, 32, 48], [0, 0, 32, 48], 0.921875], [[64, 720, 32, 48], [0, 0, 32, 48], 1.0], [[80, 720, 32, 48], [0, 0, 32, 48], 0.765625]], "#135": [[[160, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#251": [[[176, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#50": [[[96, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#97": [[[0, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#134": [[[144, 48, 32, 48], [0, 0, 32, 48], 1.0], [[144, 64, 32, 48], [0, 0, 32, 48], 0.765625]], "#260": [[[160, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#324": [[[48, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#2": [[[144, 0, 32, 32], [0, 16, 32, 32], 0.33593749999999983], [[144, 0, 32, 48], [0, 0, 32, 48], 0.4140624999999999], [[32, 528, 32, 48], [0, 0, 32, 48], 0.84375], [[48, 528, 32, 48], [0, 0, 32, 48], 1.0], [[64, 672, 32, 48], [0, 0, 32, 48], 0.921875], [[80, 672, 32, 48], [0, 0, 32, 48], 0.765625]], "#84": [[[80, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#7": [[[176, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#66": [[[208, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#11": [[[32, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#48": [[[16, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#281": [[[48, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#158": [[[96, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#184": [[[192, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#91": [[[192, 688, 32, 48], [0, 0, 32, 48], 1.0]], "#10": [[[208, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#326": [[[208, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#89": [[[160, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#292": [[[144, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#245": [[[0, 768, 32, 48], [0, 0, 32, 48], 1.0], [[16, 768, 32, 48], [0, 0, 32, 48], 0.765625]], "#17": [[[48, 560, 32, 48], [0, 0, 32, 48], 1.0], [[64, 704, 32, 48], [0, 0, 32, 48], 0.5312499999999999]], "#289": [[[176, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#229": [[[112, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#119": [[[64, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#142": [[[48, 512, 32, 48], [0, 0, 32, 48], 0.5312499999999999], [[64, 656, 32, 48], [0, 0, 32, 48], 1.0]], "#221": [[[192, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#181": [[[192, 0, 32, 48], [0, 0, 32, 48], 0.29347826086956524], [[176, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#44": [[[64, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#31": [[[208, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#108": [[[192, 400, 32, 48], [0, 0, 32, 48], 1.0]], "#236": [[[160, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#68": [[[16, 640, 32, 48], [0, 0, 32, 48], 1.0]], "#320": [[[64, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#187": [[[64, 48, 32, 48], [0, 0, 32, 48], 0.765625], [[64, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#63": [[[0, 752, 32, 48], [0, 0, 32, 48], 1.0]], "#115": [[[176, 160, 32, 48], [0, 0, 32, 48], 1.0]], "#86": [[[128, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#110": [[[32, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#207": [[[128, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#51": [[[112, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#309": [[[0, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#59": [[[192, 0, 32, 48], [0, 0, 32, 48], 1.0], [[176, 432, 32, 48], [0, 0, 32, 48], 0.6093749999999999]], "#322": [[[96, 720, 32, 48], [0, 0, 32, 48], 1.0]], "#65": [[[144, 208, 32, 48], [0, 0, 32, 48], 1.0]], "#196": [[[16, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#78": [[[32, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#140": [[[128, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#6": [[[240, 432, 16, 48], [0, 0, 16, 48], 1.0]], "#192": [[[64, 576, 32, 48], [0, 0, 32, 48], 1.0]], "#28": [[[32, 64, 32, 48], [0, 0, 32, 48], 0.29347826086956524], [[128, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#307": [[[96, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#38": [[[64, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#77": [[[0, 320, 32, 48], [0, 0, 32, 48], 1.0]], "#176": [[[0, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#193": [[[32, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#335": [[[128, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#19": [[[0, 80, 32, 48], [0, 0, 32, 48], 1.0], [[64, 80, 32, 48], [0, 0, 32, 48], 0.7395833333333336]], "#64": [[[0, 288, 32, 48], [0, 0, 32, 48], 1.0]], "#247": [[[240, 112, 16, 48], [0, 0, 16, 48], 1.0]], "#57": [[[112, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#252": [[[16, 416, 32, 48], [0, 0, 32, 48], 1.0], [[32, 416, 32, 48], [0, 0, 32, 48], 0.10714285714285679], [[64, 416, 32, 48], [0, 0, 32, 48], 0.5238095238095232]], "#228": [[[240, 160, 16, 48], [0, 0, 16, 48], 1.0]], "#100": [[[160, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#332": [[[112, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#33": [[[224, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#145": [[[48, 544, 32, 48], [0, 0, 32, 48], 1.0], [[64, 688, 32, 48], [0, 0, 32, 48], 0.765625]], "#224": [[[80, 16, 32, 48], [0, 0, 32, 48], 0.4270833333333336], [[144, 16, 32, 48], [0, 0, 32, 48], 1.0]], "#148": [[[128, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#316": [[[176, 80, 32, 48], [0, 0, 32, 48], 1.0], [[224, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#14": [[[160, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333], [[176, 0, 32, 32], [0, 16, 32, 32], 1.0], [[192, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333]], "#147": [[[48, 416, 32, 48], [0, 0, 32, 48], 1.0], [[96, 416, 32, 48], [0, 0, 32, 48], 0.6019900497512433]], "#43": [[[128, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#69": [[[48, 160, 32, 48], [0, 0, 32, 48], 1.0]], "#311": [[[176, 96, 32, 48], [0, 0, 32, 48], 1.0]], "#107": [[[224, 448, 32, 48], [0, 0, 32, 48], 0.7345132743362827], [[224, 480, 32, 48], [0, 0, 32, 48], 1.0]], "#81": [[[176, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#168": [[[192, 240, 32, 48], [0, 0, 32, 48], 1.0]], "#306": [[[16, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#166": [[[80, 48, 32, 48], [0, 0, 32, 48], 1.0], [[80, 64, 32, 48], [0, 0, 32, 48], 0.06249999999999979]], "#238": [[[96, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#173": [[[32, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#214": [[[0, 688, 32, 48], [0, 0, 32, 48], 1.0]], "#144": [[[0, 720, 32, 48], [0, 0, 32, 48], 1.0]], "#225": [[[144, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#234": [[[208, 96, 32, 48], [0, 0, 32, 48], 1.0]], "#112": [[[112, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#26": [[[208, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#156": [[[96, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#262": [[[224, 0, 32, 32], [0, 16, 32, 32], 1.0], [[224, 0, 32, 48], [0, 0, 32, 48], 0.765625], [[16, 608, 32, 48], [0, 0, 32, 48], 0.25781249999999983], [[32, 624, 32, 48], [0, 0, 32, 48], 0.4531249999999999], [[48, 624, 32, 48], [0, 0, 32, 48], 0.33593749999999983]], "#329": [[[0, 48, 32, 48], [0, 0, 32, 48], 0.3333333333333333], [[16, 48, 32, 48], [0, 0, 32, 48], 1.0], [[32, 48, 32, 48], [0, 0, 32, 48], 0.3333333333333333]], "#202": [[[80, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#194": [[[192, 288, 32, 48], [0, 0, 32, 48], 1.0]], "#263": [[[176, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#305": [[[112, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#253": [[[208, 128, 32, 48], [0, 0, 32, 48], 1.0]], "#294": [[[0, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[32, 0, 32, 32], [0, 16, 32, 32], 1.0]], "#41": [[[208, 448, 32, 48], [0, 0, 32, 48], 1.0]], "#268": [[[240, 464, 16, 48], [0, 0, 16, 48], 1.0]], "#47": [[[208, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#165": [[[144, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[144, 0, 32, 48], [0, 0, 32, 48], 0.4531249999999999], [[32, 528, 32, 48], [0, 0, 32, 48], 0.84375], [[48, 528, 32, 48], [0, 0, 32, 48], 0.921875], [[64, 672, 32, 48], [0, 0, 32, 48], 1.0], [[80, 672, 32, 48], [0, 0, 32, 48], 0.765625]], "#87": [[[224, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#27": [[[192, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#137": [[[96, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#203": [[[0, 672, 32, 48], [0, 0, 32, 48], 1.0], [[16, 672, 32, 48], [0, 0, 32, 48], 0.8828125]], "#254": [[[192, 96, 32, 48], [0, 0, 32, 48], 1.0]], "#265": [[[160, 240, 32, 48], [0, 0, 32, 48], 1.0]], "#130": [[[160, 96, 32, 48], [0, 0, 32, 48], 1.0]], "#274": [[[0, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#131": [[[112, 0, 32, 16], [0, 32, 32, 16], 1.0], [[128, 416, 32, 48], [0, 0, 32, 48], 1.0]], "#198": [[[176, 320, 32, 48], [0, 0, 32, 48], 1.0]], "#237": [[[224, 160, 32, 48], [0, 0, 32, 48], 1.0]], "#178": [[[160, 16, 32, 48], [0, 0, 32, 48], 0.8958333333333337], [[224, 16, 32, 48], [0, 0, 32, 48], 1.0]], "#172": [[[224, 0, 32, 32], [0, 16, 32, 32], 0.765625], [[224, 0, 32, 48], [0, 0, 32, 48], 1.0], [[16, 608, 32, 48], [0, 0, 32, 48], 0.21874999999999983], [[32, 624, 32, 48], [0, 0, 32, 48], 0.4140624999999999], [[48, 624, 32, 48], [0, 0, 32, 48], 0.4921874999999999]], "#183": [[[224, 512, 32, 48], [0, 0, 32, 48], 0.5209580838323348]], "#99": [[[224, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#32": [[[0, 208, 32, 48], [0, 0, 32, 48], 1.0]], "#278": [[[48, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#291": [[[112, 112, 32, 48], [0, 0, 32, 48], 0.5982142857142859], [[112, 144, 32, 48], [0, 0, 32, 48], 1.0], [[128, 144, 32, 48], [0, 0, 32, 48], 0.15178571428571377]], "#23": [[[96, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#8": [[[160, 496, 32, 48], [0, 0, 32, 48], 1.0]], "#188": [[[16, 544, 32, 48], [0, 0, 32, 48], 1.0]], "#75": [[[16, 592, 32, 48], [0, 0, 32, 48], 1.0]], "#255": [[[64, 0, 32, 32], [0, 16, 32, 32], 0.33593749999999983], [[64, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#312": [[[32, 32, 32, 48], [0, 0, 32, 48], 1.0], [[128, 448, 32, 48], [0, 0, 32, 48], 1.0]], "#90": [[[144, 544, 32, 48], [0, 0, 32, 48], 1.0]], "#227": [[[160, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#169": [[[240, 16, 16, 48], [0, 0, 16, 48], 1.0]], "#167": [[[64, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#204": [[[160, 368, 32, 48], [0, 0, 32, 48], 1.0]], "#155": [[[0, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#71": [[[32, 208, 32, 48], [0, 0, 32, 48], 1.0]], "#197": [[[0, 368, 32, 48], [0, 0, 32, 48], 1.0]], "#189": [[[224, 512, 32, 48], [0, 0, 32, 48], 1.0]], "#331": [[[160, 400, 32, 48], [0, 0, 32, 48], 1.0]], "#49": [[[144, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#24": [[[0, 16, 32, 48], [0, 0, 32, 48], 1.0], [[64, 16, 32, 48], [0, 0, 32, 48], 0.5833333333333336]], "#55": [[[208, 480, 32, 48], [0, 0, 32, 48], 1.0]], "#3": [[[0, 48, 32, 48], [0, 0, 32, 48], 0.06249999999999979], [[0, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#109": [[[0, 0, 32, 32], [0, 16, 32, 32], 0.1015624999999998], [[0, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#302": [[[80, 16, 32, 48], [0, 0, 32, 48], 1.0], [[144, 16, 32, 48], [0, 0, 32, 48], 0.4270833333333336]], "#299": [[[80, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#70": [[[96, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#246": [[[160, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#213": [[[192, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#179": [[[48, 560, 32, 48], [0, 0, 32, 48], 0.5312499999999999], [[64, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#243": [[[128, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#127": [[[80, 160, 32, 48], [0, 0, 32, 48], 1.0]], "#111": [[[144, 0, 32, 32], [0, 16, 32, 32], 1.0], [[144, 0, 32, 48], [0, 0, 32, 48], 0.765625], [[16, 512, 32, 48], [0, 0, 32, 48], 0.25781249999999983], [[32, 528, 32, 48], [0, 0, 32, 48], 0.4531249999999999], [[48, 528, 32, 48], [0, 0, 32, 48], 0.33593749999999983], [[64, 672, 32, 48], [0, 0, 32, 48], 0.37499999999999983], [[80, 672, 32, 48], [0, 0, 32, 48], 0.1796874999999998]], "#21": [[[48, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#185": [[[224, 448, 32, 48], [0, 0, 32, 48], 1.0]], "#105": [[[80, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#139": [[[64, 368, 32, 48], [0, 0, 32, 48], 1.0]], "#80": [[[176, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#301": [[[64, 48, 32, 48], [0, 0, 32, 48], 1.0], [[64, 64, 32, 48], [0, 0, 32, 48], 0.765625]], "#79": [[[192, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#121": [[[208, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#317": [[[32, 0, 32, 16], [0, 32, 32, 16], 1.0], [[80, 448, 32, 48], [0, 0, 32, 48], 1.0]], "#95": [[[48, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#74": [[[32, 320, 32, 48], [0, 0, 32, 48], 1.0]], "#223": [[[160, 112, 32, 48], [0, 0, 32, 48], 1.0], [[176, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#159": [[[16, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#220": [[[240, 0, 16, 32], [0, 16, 16, 32], 1.0]], "#280": [[[144, 80, 32, 48], [0, 0, 32, 48], 1.0]], "#271": [[[176, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#258": [[[112, 112, 32, 48], [0, 0, 32, 48], 0.28571428571428586], [[112, 144, 32, 48], [0, 0, 32, 48], 0.15178571428571377], [[128, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#5": [[[32, 576, 32, 48], [0, 0, 32, 48], 0.84375], [[48, 576, 32, 48], [0, 0, 32, 48], 1.0], [[64, 720, 32, 48], [0, 0, 32, 48], 0.921875], [[80, 720, 32, 48], [0, 0, 32, 48], 0.765625]], "#190": [[[128, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#150": [[[64, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#267": [[[48, 608, 32, 48], [0, 0, 32, 48], 1.0]], "#123": [[[144, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#195": [[[128, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#61": [[[0, 784, 32, 48], [0, 0, 32, 48], 1.0]], "#85": [[[128, 608, 32, 48], [0, 0, 32, 48], 1.0]], "#39": [[[48, 512, 32, 48], [0, 0, 32, 48], 1.0], [[64, 656, 32, 48], [0, 0, 32, 48], 0.5312499999999999]], "#67": [[[48, 592, 32, 48], [0, 0, 32, 48], 1.0], [[64, 736, 32, 48], [0, 0, 32, 48], 0.765625]], "#153": [[[32, 0, 32, 48], [0, 0, 32, 48], 1.0], [[80, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#58": [[[208, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#94": [[[208, 160, 32, 48], [0, 0, 32, 48], 1.0], [[208, 416, 32, 48], [0, 0, 32, 48], 0.4857142857142861], [[144, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#211": [[[128, 336, 32, 48], [0, 0, 32, 48], 1.0], [[160, 336, 32, 48], [0, 0, 32, 48], 0.12499999999999958]], "#319": [[[208, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#231": [[[16, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#333": [[[96, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#128": [[[0, 48, 32, 48], [0, 0, 32, 48], 1.0], [[32, 48, 32, 48], [0, 0, 32, 48], 0.37499999999999983], [[0, 64, 32, 48], [0, 0, 32, 48], 0.06249999999999979]], "#164": [[[192, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#25": [[[192, 128, 32, 48], [0, 0, 32, 48], 1.0]], "#206": [[[144, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#303": [[[160, 0, 32, 32], [0, 16, 32, 32], 0.29687499999999983], [[160, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#46": [[[0, 656, 32, 48], [0, 0, 32, 48], 1.0]], "#186": [[[32, 368, 32, 48], [0, 0, 32, 48], 1.0]], "#138": [[[80, 688, 32, 48], [0, 0, 32, 48], 1.0]], "#222": [[[96, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#124": [[[48, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#52": [[[224, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#215": [[[128, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#146": [[[192, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#1": [[[208, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#205": [[[224, 192, 32, 48], [0, 0, 32, 48], 1.0], [[224, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#323": [[[16, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#277": [[[80, 80, 32, 48], [0, 0, 32, 48], 1.0]], "#106": [[[112, 592, 32, 48], [0, 0, 32, 48], 1.0]], "#336": [[[144, 400, 32, 48], [0, 0, 32, 48], 1.0]], "#22": [[[224, 0, 32, 16], [0, 32, 32, 16], 1.0]], "#257": [[[160, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#209": [[[80, 144, 32, 48], [0, 0, 32, 48], 1.0], [[144, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#328": [[[64, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#34": [[[48, 0, 32, 48], [0, 0, 32, 48], 1.0]], "#304": [[[144, 32, 32, 48], [0, 0, 32, 48], 1.0]], "#296": [[[176, 192, 32, 48], [0, 0, 32, 48], 1.0]], "#283": [[[240, 224, 16, 48], [0, 0, 16, 48], 1.0]], "#88": [[[112, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#239": [[[176, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#288": [[[0, 576, 32, 48], [0, 0, 32, 48], 1.0]], "#132": [[[128, 368, 32, 48], [0, 0, 32, 48], 1.0], [[160, 368, 32, 48], [0, 0, 32, 48], 0.12499999999999958]], "#9": [[[0, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#170": [[[112, 576, 32, 48], [0, 0, 32, 48], 1.0]], "#182": [[[144, 704, 32, 48], [0, 0, 32, 48], 1.0]], "#118": [[[0, 48, 32, 48], [0, 0, 32, 48], 0.37499999999999983], [[32, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#129": [[[80, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333], [[96, 0, 32, 32], [0, 16, 32, 32], 1.0], [[112, 0, 32, 32], [0, 16, 32, 32], 0.3333333333333333]], "#219": [[[160, 608, 32, 48], [0, 0, 32, 48], 1.0]], "#264": [[[0, 16, 32, 48], [0, 0, 32, 48], 0.5833333333333336], [[64, 16, 32, 48], [0, 0, 32, 48], 1.0]], "#284": [[[0, 624, 32, 48], [0, 0, 32, 48], 1.0]], "#230": [[[192, 0, 32, 16], [0, 32, 32, 16], 1.0], [[176, 416, 32, 48], [0, 0, 32, 48], 1.0]], "#20": [[[16, 784, 32, 48], [0, 0, 32, 48], 1.0]], "#102": [[[0, 80, 32, 48], [0, 0, 32, 48], 0.7395833333333336], [[64, 80, 32, 48], [0, 0, 32, 48], 1.0]], "#54": [[[80, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#98": [[[80, 592, 32, 48], [0, 0, 32, 48], 1.0]], "#266": [[[64, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#313": [[[224, 176, 32, 48], [0, 0, 32, 48], 1.0], [[224, 416, 32, 48], [0, 0, 32, 48], 1.0]], "#295": [[[16, 208, 32, 48], [0, 0, 32, 48], 1.0]], "#18": [[[160, 560, 32, 48], [0, 0, 32, 48], 1.0]], "#314": [[[96, 112, 32, 48], [0, 0, 32, 48], 1.0]], "#133": [[[80, 544, 32, 48], [0, 0, 32, 48], 1.0]], "#330": [[[80, 336, 32, 48], [0, 0, 32, 48], 1.0]], "#93": [[[96, 528, 32, 48], [0, 0, 32, 48], 0.921875], [[112, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#233": [[[80, 112, 32, 48], [0, 0, 32, 48], 1.0], [[128, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#35": [[[128, 304, 32, 48], [0, 0, 32, 48], 1.0]], "#141": [[[192, 496, 32, 48], [0, 0, 32, 48], 1.0]], "#261": [[[80, 736, 32, 48], [0, 0, 32, 48], 1.0]], "#321": [[[112, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#298": [[[176, 352, 32, 48], [0, 0, 32, 48], 1.0]], "#282": [[[224, 224, 32, 48], [0, 0, 32, 48], 1.0], [[176, 496, 32, 48], [0, 0, 32, 48], 1.0]], "#212": [[[96, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#72": [[[48, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#244": [[[112, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#104": [[[112, 112, 32, 48], [0, 0, 32, 48], 1.0], [[112, 144, 32, 48], [0, 0, 32, 48], 0.5982142857142859], [[128, 144, 32, 48], [0, 0, 32, 48], 0.28571428571428586]], "#249": [[[192, 272, 32, 48], [0, 0, 32, 48], 1.0]], "#143": [[[208, 400, 32, 48], [0, 0, 32, 48], 1.0]], "#248": [[[0, 0, 32, 32], [0, 16, 32, 32], 1.0], [[32, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[0, 0, 32, 48], [0, 0, 32, 48], 0.1015624999999998]], "#199": [[[64, 0, 32, 32], [0, 16, 32, 32], 1.0], [[64, 0, 32, 48], [0, 0, 32, 48], 0.33593749999999983]], "#235": [[[32, 768, 32, 48], [0, 0, 32, 48], 1.0]], "#152": [[[224, 144, 32, 48], [0, 0, 32, 48], 1.0]], "#117": [[[96, 192, 32, 48], [0, 0, 32, 48], 1.0]], "#290": [[[240, 400, 16, 48], [0, 0, 16, 48], 1.0]], "#120": [[[224, 256, 32, 48], [0, 0, 32, 48], 1.0], [[224, 400, 32, 48], [0, 0, 32, 48], 1.0], [[176, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#36": [[[144, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#338": [[[112, 512, 32, 48], [0, 0, 32, 48], 1.0]], "#180": [[[48, 544, 32, 48], [0, 0, 32, 48], 0.765625], [[64, 688, 32, 48], [0, 0, 32, 48], 1.0]], "#175": [[[144, 48, 32, 48], [0, 0, 32, 48], 0.765625], [[144, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#334": [[[144, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#327": [[[64, 176, 32, 48], [0, 0, 32, 48], 1.0]], "#300": [[[48, 224, 32, 48], [0, 0, 32, 48], 1.0]], "#122": [[[16, 688, 32, 48], [0, 0, 32, 48], 1.0]], "#240": [[[48, 640, 32, 48], [0, 0, 32, 48], 1.0]], "#154": [[[16, 64, 32, 48], [0, 0, 32, 48], 1.0]], "#30": [[[240, 256, 16, 48], [0, 0, 16, 48], 1.0]], "#151": [[[192, 544, 32, 48], [0, 0, 32, 48], 1.0]], "#297": [[[224, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#256": [[[112, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#339": [[[32, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#157": [[[192, 432, 32, 48], [0, 0, 32, 48], 1.0]], "#163": [[[208, 176, 32, 48], [0, 0, 32, 48], 1.0], [[128, 672, 32, 48], [0, 0, 32, 48], 1.0]], "#160": [[[160, 16, 32, 48], [0, 0, 32, 48], 1.0], [[224, 16, 32, 48], [0, 0, 32, 48], 0.8958333333333337]], "#171": [[[112, 400, 32, 48], [0, 0, 32, 48], 1.0]], "#242": [[[16, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#103": [[[160, 0, 32, 32], [0, 16, 32, 32], 1.0], [[192, 0, 32, 32], [0, 16, 32, 32], 0.37499999999999983], [[160, 0, 32, 48], [0, 0, 32, 48], 0.29687499999999983]], "#96": [[[128, 48, 32, 48], [0, 0, 32, 48], 1.0]], "#161": [[[240, 144, 16, 48], [0, 0, 16, 48], 1.0]], "#275": [[[0, 528, 32, 48], [0, 0, 32, 48], 1.0]], "#310": [[[208, 464, 32, 48], [0, 0, 32, 48], 1.0]], "#210": [[[128, 0, 32, 16], [0, 32, 32, 16], 1.0]]}}, "#251": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_39.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#50": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_289.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#97": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_52.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#134": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_83.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#260": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_312.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#324": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_158.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#2": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_246.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#84": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_180.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#7": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_336.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#66": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_231.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#11": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_201.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#48": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_56.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#281": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_10.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#158": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_99.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#184": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_88.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#91": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_310.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#10": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_279.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#326": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_306.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#89": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_35.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#292": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_170.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#245": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_302.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#17": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_255.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#149": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_168.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#289": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_165.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#229": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_25.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#119": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_197.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#142": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_286.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#221": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_91.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#181": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_214.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#44": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_103.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#31": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_44.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#108": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_228.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#208": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_244.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#37": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_142.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#241": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_193.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#273": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_30.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#83": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_143.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#73": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_19.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#250": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_33.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#279": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_164.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#286": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_150.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#12": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_71.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#113": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_6.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#315": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_195.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#293": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_309.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#232": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_190.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#4": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_43.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#174": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_87.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#216": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_102.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#218": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_41.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#201": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_330.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#276": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_334.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#116": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_221.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#29": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_59.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#60": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_207.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#136": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_47.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#53": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_213.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#92": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_298.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#162": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_20.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#16": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_308.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#82": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_62.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#191": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_65.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#270": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_297.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#135": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_233.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#121": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_135.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#317": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_12.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#95": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_60.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#74": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_203.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#223": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_119.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#159": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_5.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#220": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_96.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#280": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_85.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#271": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_311.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#258": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_115.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#5": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_256.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#190": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_177.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#150": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_219.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#267": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_265.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#123": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_147.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#195": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_273.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#61": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_303.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#85": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_320.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#39": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_245.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#67": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_257.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#153": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_8.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#58": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_92.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#94": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_313.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#211": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_148.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#319": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_94.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#231": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_106.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#333": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_24.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#128": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_53.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#42": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_324.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#164": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_307.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#25": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_124.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#206": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_224.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#236": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_149.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#68": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_269.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#320": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_109.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#187": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_67.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#63": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_301.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#115": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_166.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#86": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_333.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#110": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_217.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#207": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_77.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#51": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_260.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#309": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_111.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#59": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_42.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#322": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_299.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#65": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_172.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#196": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_7.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#78": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_107.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#140": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_315.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#6": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_232.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#192": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_263.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#28": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_223.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#307": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_74.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#38": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_14.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#77": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_206.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#176": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_291.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#193": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_101.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#335": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_27.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#19": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_55.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#64": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_205.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#247": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_123.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#57": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_80.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#252": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_208.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#228": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_131.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#100": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_331.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#332": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_184.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#33": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_122.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#145": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_247.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#224": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_34.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#148": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_116.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#316": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_241.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#14": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_40.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#147": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_209.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#43": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_211.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#69": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_157.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#311": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_118.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#107": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_243.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#81": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_141.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#168": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_173.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#306": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_112.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#126": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_325.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#166": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_70.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#238": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_182.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#173": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_163.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#214": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_283.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#144": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_292.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#225": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_31.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#234": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_121.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#112": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_187.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#26": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_338.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#156": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_185.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#262": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_49.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#329": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_57.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#202": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_69.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#194": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_188.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#263": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_332.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#118": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_64.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#129": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_23.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#219": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_321.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#264": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_17.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#284": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_268.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#230": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_46.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#20": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_305.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#102": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_68.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#54": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_198.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#98": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_264.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#266": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_253.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#313": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_133.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#295": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_154.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#18": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_275.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#314": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_98.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#133": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_254.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#330": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_186.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#93": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_251.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#233": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_104.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#35": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_178.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#141": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_236.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#261": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_300.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#321": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_210.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#298": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_145.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#282": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_136.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#212": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_75.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#72": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_108.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#244": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_181.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#104": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_113.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#249": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_189.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#143": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_229.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#248": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_2.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#303": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_37.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#46": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_281.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#186": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_175.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#138": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_290.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#222": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_73.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#124": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_61.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#52": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_93.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#215": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_79.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#146": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_278.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#1": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_280.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#205": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_128.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#101": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_326.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#323": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_295.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#277": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_72.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#106": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_262.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#336": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_226.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#22": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_48.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#257": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_89.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#209": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_110.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#328": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_204.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#34": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_9.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#304": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_82.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#296": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_167.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#283": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_137.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#88": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_81.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#239": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_276.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#288": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_258.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#132": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_151.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#9": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_293.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#217": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_327.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#170": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_261.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#182": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_316.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#90": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_272.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#227": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_335.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#337": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_323.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#169": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_97.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#167": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_202.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#204": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_152.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#155": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_105.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#71": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_155.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#197": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_176.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#189": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_317.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#331": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_227.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#49": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_274.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#24": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_4.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#55": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_239.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#3": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_54.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#109": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_3.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#302": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_21.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#299": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_183.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#70": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_179.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#246": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_86.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#213": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_337.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#179": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_296.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#243": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_329.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#127": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_161.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#111": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_32.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#21": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_218.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#185": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_240.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#105": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_18.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#139": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_174.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#80": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_90.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#301": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_66.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#79": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_339.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#199": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_15.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#235": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_304.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#152": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_126.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#117": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_100.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#290": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_230.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#120": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_139.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#36": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_171.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#338": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_250.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#180": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_288.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#175": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_84.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#334": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_212.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#327": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_160.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#300": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_196.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#122": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_285.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#240": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_267.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#154": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_58.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#30": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_140.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#151": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_277.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#297": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_95.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#256": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_222.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#339": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_284.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#157": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_215.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#163": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_314.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#160": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_38.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#171": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_225.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#242": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_216.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#103": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_36.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#96": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_78.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#161": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_127.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#275": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_248.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#310": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_238.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#210": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_28.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#305": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_76.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#253": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_125.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#294": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_13.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#41": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_237.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#268": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_242.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#47": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_45.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#165": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_287.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#87": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_194.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#27": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_234.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#137": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_22.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#203": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_282.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#254": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_120.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#265": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_144.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#130": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_117.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#274": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_1.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#131": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_29.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#226": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_328.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}, "#198": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_146.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#237": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_130.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#178": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_51.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#172": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_50.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#183": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_318.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#99": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_192.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#32": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_156.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#278": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_11.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#291": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_114.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#23": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_199.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#8": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_235.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#188": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_249.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#75": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_259.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#255": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_16.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#312": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_63.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#56": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_294.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#40": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_138.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#269": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_200.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#318": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_26.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#125": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_220.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#308": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_162.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#200": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_322.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#285": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_266.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#114": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_319.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#177": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_159.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#76": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_134.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#45": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_191.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#62": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_252.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#15": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_153.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": ["#0"]}, "#13": {"kind": "single", "path": "Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16/Modern_Office_Singles_169.png", "tags": ["revamped", "office", "singles"], "shape": [32, 48], "tilesets": []}})
+    </script>
+</body>
+</html>
+
