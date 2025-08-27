@@ -1004,6 +1004,23 @@
                  "width":138.333,
                  "x":1132.16683333333,
                  "y":94.0833333333333
+                }, 
+                {
+                 "height":27,
+                 "id":118,
+                 "name":"playerPositions",
+                 "properties":[
+                        {
+                         "name":"{}",
+                         "type":"object",
+                         "value":0
+                        }],
+                 "rotation":0,
+                 "type":"variable",
+                 "visible":true,
+                 "width":47.5,
+                 "x":25.5,
+                 "y":963
                 }],
          "opacity":1,
          "properties":[
@@ -1112,7 +1129,7 @@
          "y":0
         }],
  "nextlayerid":65,
- "nextobjectid":115,
+ "nextobjectid":119,
  "orientation":"orthogonal",
  "properties":[
         {

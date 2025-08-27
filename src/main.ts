@@ -4,9 +4,15 @@ import { bootstrapExtra } from "@workadventure/scripting-api-extra";
 
 // Tipos para o sistema de reserva de mesas
 type DeskOccupant = { name: string; since: number };
+type PlayerPosition = { x: number; y: number };
 
-// Estado local das mesas (não persistente entre sessões)
-let desksState: Record<string, DeskOccupant | null> = {};
+// Extensão do tipo RoomState para incluir nossas variáveis
+declare module "@workadventure/iframe-api-typings" {
+    interface RoomState {
+        desks: Record<string, DeskOccupant | null>;
+        playerPositions: Record<string, PlayerPosition>;
+    }
+}
 
 console.log('Script started successfully');
 
@@ -19,9 +25,35 @@ const getDesks = () => (WA.state.desks ?? {}) as Record<string, DeskOccupant | n
 const saveDesks = (next: Record<string, DeskOccupant | null>) =>
   WA.state.saveVariable("desks", next);
 
+// Funções utilitárias para gerenciar posições dos jogadores
+const getPlayerPositions = () => (WA.state.playerPositions ?? {}) as Record<string, PlayerPosition>;
+const savePlayerPositions = (next: Record<string, PlayerPosition>) =>
+  WA.state.saveVariable("playerPositions", next);
 
+// Função para salvar a posição atual do jogador
+const saveCurrentPlayerPosition = async () => {
+    const position = await WA.player.getPosition();
+    const playerName = WA.player.name;
+    const positions = getPlayerPositions();
+    
+    positions[playerName] = { x: position.x, y: position.y };
+    savePlayerPositions(positions);
+    console.log(`💾 Posição salva para ${playerName}: x=${position.x}, y=${position.y}`);
+};
 
-
+// Função para restaurar a posição do jogador
+const restorePlayerPosition = () => {
+    const playerName = WA.player.name;
+    const positions = getPlayerPositions();
+    const savedPosition = positions[playerName];
+    
+    if (savedPosition) {
+        WA.player.moveTo(savedPosition.x, savedPosition.y);
+        console.log(`🔄 Posição restaurada para ${playerName}: x=${savedPosition.x}, y=${savedPosition.y}`);
+    } else {
+        console.log(`ℹ️ Nenhuma posição salva encontrada para ${playerName}`);
+    }
+};
 
 // Função para mostrar popup de reserva de mesa
 const showDeskReservationPopup = (areaName: string) => {
@@ -109,6 +141,9 @@ WA.onInit().then(() => {
     console.log('Scripting API ready');
     console.log('Player tags: ',WA.player.tags)
 
+    // Restaura a posição do jogador ao entrar
+    restorePlayerPosition();
+
     // Sistema de relógio existente
     WA.room.area.onEnter('clock').subscribe(() => {
         const today = new Date();
@@ -164,8 +199,8 @@ WA.onInit().then(() => {
       console.log('Desk area: ',areaName)
     });
 
-        // Teste: verificar se a variável desks existe
-    console.log("=== TESTE DE VARIÁVEL DESKS ===");
+    // Teste: verificar se as variáveis existem
+    console.log("=== TESTE DE VARIÁVEIS ===");
     try {
       const testDesks = getDesks();
       console.log("✅ Variável 'desks' encontrada:", testDesks);
@@ -173,16 +208,30 @@ WA.onInit().then(() => {
       console.log("❌ Variável 'desks' NÃO encontrada:", e);
       console.log("💡 Crie um objeto no Tiled com nome 'desks' e tipo 'variable'");
     }
+    
+    try {
+      const testPositions = getPlayerPositions();
+      console.log("✅ Variável 'playerPositions' encontrada:", testPositions);
+    } catch (e) {
+      console.log("❌ Variável 'playerPositions' NÃO encontrada:", e);
+      console.log("💡 Crie um objeto no Tiled com nome 'playerPositions' e tipo 'variable'");
+    }
     console.log("=== FIM DO TESTE ===");
 
     // Listener para mudanças no estado das mesas (atualização em tempo real)
     WA.state.onVariableChange("desks").subscribe(() => {
-      const desks = getDesks();
-      
-      // Não atualiza popups automaticamente - deixa o usuário controlar
+      console.log("🔄 Estado das mesas atualizado");
     });
 
+    // Salva a posição do jogador periodicamente (a cada 5 segundos)
+    setInterval(() => {
+        saveCurrentPlayerPosition();
+    }, 5000);
 
+    // Salva a posição quando o jogador se move
+    WA.player.onPlayerMove(() => {
+        saveCurrentPlayerPosition();
+    });
 
     // The line below bootstraps the Scripting API Extra library that adds a number of advanced properties/features to WorkAdventure
     bootstrapExtra().then(() => {

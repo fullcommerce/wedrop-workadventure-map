@@ -603,7 +603,7 @@
         {
          "columns":6,
          "firstgid":1827,
-         "image":"tilesets\/WA_Logo_Long.png",
+         "image":"tilesets\/logo-espacada.png",
          "imageheight":32,
          "imagewidth":192,
          "margin":0,
