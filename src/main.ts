@@ -20,7 +20,6 @@ let currentPopup: any = undefined;
 let currentDeskPopup: any = undefined;
 let currentDeskMessage: any = undefined;
 let isPopupOpen = false; // Flag para controlar se há popup aberto
-let popupIdCounter = 0; // Contador para IDs únicos de popup
 
 // Funções utilitárias para gerenciar o estado das mesas
 const getDesks = () => (WA.state.desks ?? {}) as Record<string, DeskOccupant | null>;
@@ -114,15 +113,11 @@ const showDeskReservationPopup = (areaName: string) => {
     // Fecha popup anterior se existir
     safeClosePopup(currentDeskPopup, "popup anterior");
     
-    // Gera ID único para o popup
-    popupIdCounter++;
-    const uniquePopupId = `desk-popup-${popupIdCounter}`;
-    
     isPopupOpen = true; // Marca que há popup aberto
-    console.log(`🆕 Abrindo popup ${uniquePopupId} para área: ${areaName}`);
+    console.log(`🆕 Abrindo popup para área: ${areaName}`);
     
     currentDeskPopup = WA.ui.openPopup(
-      uniquePopupId,
+      `${areaName}-available-popup`,
       popupMessage,
       [
         {
@@ -238,21 +233,19 @@ WA.onInit().then(() => {
       // Ao sair da área da mesa - fecha o popup e mensagem
       WA.room.area.onLeave(areaName).subscribe(() => {
         console.log(`🚶 Saiu da área: ${areaName}`);
-        // Delay maior para dar tempo do usuário clicar nos botões
-        setTimeout(() => {
-          // Fecha o popup da mesa se estiver aberto
-          if (currentDeskPopup) {
-            safeClosePopup(currentDeskPopup, `área ${areaName}`);
-            currentDeskPopup = null;
-            isPopupOpen = false; // Reseta a flag
-          }
-          
-          // Remove a mensagem se estiver visível
-          if (currentDeskMessage) {
-            safeRemoveMessage(currentDeskMessage, `área ${areaName}`);
-            currentDeskMessage = null;
-          }
-        }, 1000); // 1 segundo de delay para dar tempo de clicar
+        // Fecha imediatamente ao sair da área
+        // Fecha o popup da mesa se estiver aberto
+        if (currentDeskPopup) {
+          safeClosePopup(currentDeskPopup, `área ${areaName}`);
+          currentDeskPopup = null;
+          isPopupOpen = false; // Reseta a flag
+        }
+        
+        // Remove a mensagem se estiver visível
+        if (currentDeskMessage) {
+          safeRemoveMessage(currentDeskMessage, `área ${areaName}`);
+          currentDeskMessage = null;
+        }
       });
 
       console.log('Desk area: ',areaName)
