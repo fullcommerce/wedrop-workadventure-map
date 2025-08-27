@@ -24,18 +24,7 @@ let isPopupOpen = false; // Flag para controlar se há popup aberto
 // Funções utilitárias para gerenciar o estado das mesas
 const getDesks = () => {
   try {
-    // Tenta localStorage primeiro
-    const localDesks = localStorage.getItem('wa_desks');
-    if (localDesks) {
-      const parsedDesks = JSON.parse(localDesks);
-      console.log("📖 Desks lido do localStorage:", parsedDesks);
-      return parsedDesks as Record<string, DeskOccupant | null>;
-    }
-    
-    // Fallback para WA.state
-    const waDesks = WA.state.desks ?? {};
-    console.log("📖 Desks lido do WA.state:", waDesks);
-    return waDesks as Record<string, DeskOccupant | null>;
+    return (WA.state.desks ?? {}) as Record<string, DeskOccupant | null>;
   } catch (e) {
     console.log("⚠️ Erro ao ler desks, retornando objeto vazio:", e);
     return {};
@@ -44,17 +33,8 @@ const getDesks = () => {
 
 const saveDesks = async (next: Record<string, DeskOccupant | null>) => {
   try {
-    // Salva no localStorage primeiro
-    localStorage.setItem('wa_desks', JSON.stringify(next));
-    console.log("💾 Desks salvo no localStorage:", next);
-    
-    // Tenta salvar também no WA.state
-    try {
-      await WA.state.saveVariable("desks", next);
-      console.log("💾 Desks salvo também no WA.state:", next);
-    } catch (waError) {
-      console.log("⚠️ Erro ao salvar no WA.state, mas localStorage foi salvo:", waError);
-    }
+    await WA.state.saveVariable("desks", next);
+    console.log("💾 Desks salvo com sucesso:", next);
   } catch (e) {
     console.log("❌ Erro ao salvar desks:", e);
     throw e;
@@ -64,18 +44,7 @@ const saveDesks = async (next: Record<string, DeskOccupant | null>) => {
 // Funções utilitárias para gerenciar posições dos jogadores
 const getPlayerPositions = () => {
   try {
-    // Tenta localStorage primeiro
-    const localPositions = localStorage.getItem('wa_playerPositions');
-    if (localPositions) {
-      const parsedPositions = JSON.parse(localPositions);
-      console.log("📖 PlayerPositions lido do localStorage:", parsedPositions);
-      return parsedPositions as Record<string, PlayerPosition>;
-    }
-    
-    // Fallback para WA.state
-    const waPositions = WA.state.playerPositions ?? {};
-    console.log("📖 PlayerPositions lido do WA.state:", waPositions);
-    return waPositions as Record<string, PlayerPosition>;
+    return (WA.state.playerPositions ?? {}) as Record<string, PlayerPosition>;
   } catch (e) {
     console.log("⚠️ Erro ao ler playerPositions, retornando objeto vazio:", e);
     return {};
@@ -84,17 +53,8 @@ const getPlayerPositions = () => {
 
 const savePlayerPositions = async (next: Record<string, PlayerPosition>) => {
   try {
-    // Salva no localStorage primeiro
-    localStorage.setItem('wa_playerPositions', JSON.stringify(next));
-    console.log("💾 PlayerPositions salvo no localStorage:", next);
-    
-    // Tenta salvar também no WA.state
-    try {
-      await WA.state.saveVariable("playerPositions", next);
-      console.log("💾 PlayerPositions salvo também no WA.state:", next);
-    } catch (waError) {
-      console.log("⚠️ Erro ao salvar no WA.state, mas localStorage foi salvo:", waError);
-    }
+    await WA.state.saveVariable("playerPositions", next);
+    console.log("💾 PlayerPositions salvo com sucesso:", next);
   } catch (e) {
     console.log("❌ Erro ao salvar playerPositions:", e);
     throw e;
